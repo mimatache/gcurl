@@ -1,0 +1,39 @@
+name: Pull Requests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request: {}
+
+jobs:
+  # Runs the linter
+  linting:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.18'
+      - name: vet
+        run: go vet ./...
+      - name: lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.45
+
+  unit-tests:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.18'
+      - name: Unit Tests
+        run: go test -json ./... > test.json
+      - name: Annotate tests
+        if: always()
+        uses: guyarb/golang-test-annoations@v0.5.1
+        with:
+          test-results: unit-test.json
