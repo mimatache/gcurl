@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  linting:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.18'
+      - name: vet
+        run: go vet ./...
+      - name: lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.45
+
+  unit-tests:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.18'
+      - name: Unit Tests
+        run: go test -json ./... > test.json
+      - name: Annotate tests
+        if: always()
+        uses: guyarb/golang-test-annoations@v0.5.1
+        with:
+          test-results: unit-test.json
+          
+  tag:
+    name: tag
+    needs: ["linting", "unit-tests"]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: go-semantic-release/action@v1
+      id: semrel
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        allow-initial-development-versions: true
+        force-bump-patch-version: true
+    - run: echo v${{ steps.semrel.outputs.version }} > version.txt
+    - uses: actions/upload-artifact@v3
+      with:
+        name: my-artifact
+        path: version.txt
+        
+  releases-matrix:
+    name: Release Go Binary
+    needs: [tag]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/download-artifact@v3
+      with:
+        name: my-artifact
+    - name: Set APP_VERSION env
+      run: echo APP_VERSION=$(echo version.txt ) >> ${GITHUB_ENV}
+    - name: Set BUILD_TIME env
+      run: echo BUILD_TIME=$(date) >> ${GITHUB_ENV}
+    - uses: wangyoucao577/go-release-action@v1.26
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        goos: ${{ matrix.goos }}
+        goarch: ${{ matrix.goarch }}
+        goversion: 1.18
+        binary_name: "gcurl"
+        extra_files: LICENSE README.md
+        ldflags: -X 'github.com/mimatache/gcurl/version.version=${{ env.APP_VERSION }}' -X 'github.com/mimatache/gcurl/version.buildDate=${{ env.BUILD_TIME }}' -X 'github.com/mimatache/gcurl/version.commitHash=${{ github.sha }}'
