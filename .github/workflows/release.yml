@@ -44,7 +44,7 @@ jobs:
     - uses: go-semantic-release/action@v1
       id: semrel
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ secrets.TAG_TOKEN }}
         allow-initial-development-versions: true
         force-bump-patch-version: true
     - run: echo v${{ steps.semrel.outputs.version }} > version.txt
